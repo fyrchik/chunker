@@ -130,7 +130,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		if r.bpos == r.end {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
 
-			if count < r.min-1 && !r.updateBuf() {
+			if count < r.min && !r.updateBuf() {
 				if r.err != io.EOF {
 					return nil, r.err
 				}
@@ -152,14 +152,15 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 			return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
 		} else if r.bpos == r.end {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
-			r.start = r.bpos
 
-			if !r.updateBuf() {
-				if r.err == io.EOF {
-					break
+			if count == r.max {
+				return r.chunk(buf), nil
+			} else if count < r.max && !r.updateBuf() {
+				if r.err != io.EOF {
+					return nil, r.err
 				}
 
-				return nil, r.err
+				return r.chunk(buf), nil
 			}
 		}
 	}

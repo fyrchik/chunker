@@ -96,24 +96,43 @@ func TestRabin_SmallChunks(t *testing.T) {
 }
 
 func TestRabin_BadReader(t *testing.T) {
-	chunkSize := 2 * MiB
 	buf := getRandom(2, 16*MiB)
-	r := NewRabinWithParams(chunkSize, chunkSize)
-	gr := newErrorReaderFromBuf(3*MiB, buf)
-	r.Reset(gr)
 
-	c, err := r.Next(nil)
-	require.NoError(t, err)
-	require.Equal(t, chunkSize, len(c.Data))
+	t.Run("error at second buffer fill", func(t *testing.T) {
+		chunkSize := bufSize
+		r := NewRabinWithParams(chunkSize, chunkSize)
+		gr := newErrorReaderFromBuf(3*MiB, buf)
+		r.Reset(gr)
 
-	wellBehaved(t, gr, r)
+		c, err := r.Next(nil)
+		require.NoError(t, err)
+		require.Equal(t, chunkSize, len(c.Data))
 
-	chunkSize = 4 * MiB
-	r = NewRabinWithParams(chunkSize, chunkSize)
-	gr = newErrorReaderFromBuf(3*MiB, buf)
-	r.Reset(gr)
+		wellBehaved(t, gr, r)
+	})
 
-	wellBehaved(t, gr, r)
+	t.Run("error on first buffer fill", func(t *testing.T) {
+		chunkSize := 4 * MiB
+		r := NewRabinWithParams(chunkSize, chunkSize)
+		gr := newErrorReaderFromBuf(3*MiB, buf)
+
+		r.Reset(gr)
+		wellBehaved(t, gr, r)
+	})
+
+	t.Run("error on buffer boundary", func(t *testing.T) {
+		chunkSize := bufSize * 2
+		r := NewRabinWithParams(chunkSize/2+1, chunkSize)
+		buf := getRandom(0, bufSize*4)
+		gr := newErrorReaderFromBuf(chunkSize, buf)
+
+		r.Reset(gr)
+		c, err := r.Next(buf)
+		require.NoError(t, err)
+		require.Equal(t, chunkSize, len(c.Data))
+
+		wellBehaved(t, gr, r)
+	})
 }
 
 // wellBehaved checks if Next method doesn't use reader
