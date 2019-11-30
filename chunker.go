@@ -17,6 +17,7 @@ type Chunker interface {
 	Reset(r io.Reader)
 	// Next returns next Chunk. buf is a preallocated buffer for chunk's contents.
 	// Any particular implementation should not assume that buf != nil.
+	// Next should return nil error iff Chunk is not nil.
 	Next(buf []byte) (*Chunk, error)
 }
 
