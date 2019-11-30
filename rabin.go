@@ -89,7 +89,7 @@ func NewRabin() *rabin {
 }
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
-	if r.bpos == r.end {
+	if r.end == 0 || r.bpos == r.end {
 		if r.err != nil {
 			return nil, r.err
 		}
