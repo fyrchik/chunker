@@ -39,10 +39,12 @@ func (r *gentleReader) Read(p []byte) (n int, err error) {
 	return n, r.Err
 }
 
-func newErrorReaderFromBuf(after int, buf []byte) *errorReader {
-	return &errorReader{
-		after:  after,
-		Reader: bytes.NewReader(buf),
+func newErrorReaderFromBuf(after int, buf []byte) *gentleReader {
+	return &gentleReader{
+		Reader: &errorReader{
+			after:  after,
+			Reader: bytes.NewReader(buf),
+		},
 	}
 }
 

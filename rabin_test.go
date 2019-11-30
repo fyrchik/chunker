@@ -99,7 +99,7 @@ func TestRabin_BadReader(t *testing.T) {
 	chunkSize := 2 * MiB
 	buf := getRandom(2, 16*MiB)
 	r := NewRabinWithParams(chunkSize, chunkSize)
-	gr := &gentleReader{Reader: newErrorReaderFromBuf(3*MiB, buf)}
+	gr := newErrorReaderFromBuf(3*MiB, buf)
 	r.Reset(gr)
 
 	c, err := r.Next(nil)
@@ -113,7 +113,7 @@ func TestRabin_BadReader(t *testing.T) {
 
 	chunkSize = 4 * MiB
 	r = NewRabinWithParams(chunkSize, chunkSize)
-	gr = &gentleReader{Reader: newErrorReaderFromBuf(3*MiB, buf)}
+	gr = newErrorReaderFromBuf(3*MiB, buf)
 	r.Reset(gr)
 
 	c, err = r.Next(nil)

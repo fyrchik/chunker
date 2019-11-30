@@ -105,7 +105,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		r.bpos++
 
 		if r.bpos == r.end && count < r.min-1 {
-			if r.err == io.EOF {
+			if r.err != nil {
 				break
 			}
 
@@ -116,6 +116,10 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 				return nil, r.err
 			}
 		}
+	}
+
+	if r.err != nil && r.err != io.EOF {
+		return nil, r.err
 	}
 
 	if r.digest&mask == 0 || (r.bpos == r.end && r.err == io.EOF) {
@@ -138,10 +142,8 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
 
 			r.updateBuf()
-			if r.err == io.EOF {
+			if r.err != nil {
 				break
-			} else if r.err != nil {
-				return nil, r.err
 			}
 		}
 	}
