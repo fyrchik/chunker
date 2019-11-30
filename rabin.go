@@ -137,7 +137,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 				Length: count,
 				Digest: uint64(r.digest),
 				Data:   append(buf, r.buf[r.start:r.bpos]...),
-			}, nil
+			}, err
 		} else if r.bpos == r.end {
 			if err = r.updateBuf(); err == io.EOF {
 				break
@@ -151,7 +151,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		Length: count,
 		Digest: uint64(r.digest),
 		Data:   append(buf, r.buf[r.start:r.end]...),
-	}, nil
+	}, err
 }
 
 func (r *rabin) updateBuf() (err error) {

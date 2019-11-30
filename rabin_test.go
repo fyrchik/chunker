@@ -41,7 +41,12 @@ func TestRabin_Next(t *testing.T) {
 
 	for i, ch := range chunks {
 		c, err := r.Next(make([]byte, 2*MiB))
-		require.NoError(t, err)
+		if i == len(chunks)-1 {
+			require.Equal(t, io.EOF, err)
+		} else {
+			require.NoError(t, err)
+		}
+
 		require.NotNil(t, c, "chunk #%d is nil", i)
 		assert.Equal(t, ch.len, c.Length, "chunk #%d length", i)
 		assert.Equal(t, ch.digest, c.Digest, "chunk #%d digest", i)
