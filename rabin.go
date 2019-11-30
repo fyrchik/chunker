@@ -8,11 +8,18 @@ import (
 const defaultPoly = Poly(0x3DA3358B4DC173)
 
 const (
+	// minSize is default min chunk size = 512 KiB.
 	minSize = 1 << 19
+	// maxSize is default max chunk size = 8 MiB.
 	maxSize = 1 << 23
+	// avgSize is an average chunk size = 1 MiB.
 	avgSize = 1 << 20
-	mask    = avgSize - 1
+	// mask is used for detecting boundaries and is calculated based on
+	// average chunk size.
+	mask = avgSize - 1
+	// winSize is default window size
 	winSize = 64
+	// bufSize is default internal buffer size
 	bufSize = 2 * MiB
 )
 
@@ -90,6 +97,8 @@ func (r *rabin) Reset(br io.Reader) {
 	r.slide(1)
 }
 
+// NewRabinWithParams returns rabin Chunker with specified
+// min and max chunks sizes.
 func NewRabinWithParams(min, max int) *rabin {
 	return &rabin{
 		min: min,
@@ -97,10 +106,12 @@ func NewRabinWithParams(min, max int) *rabin {
 	}
 }
 
+// NewRabin returns default rabin Chunker.
 func NewRabin() *rabin {
 	return NewRabinWithParams(minSize, maxSize)
 }
 
+// Next implements Chunker interface.
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	if r.end == 0 || r.bpos == r.end {
 		if !r.updateBuf() {
