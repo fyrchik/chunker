@@ -29,6 +29,8 @@ func TestChunker_Correct(t *testing.T) {
 	buf := getRandom(1, 128)
 
 	for _, impl := range implToTest {
+		impl := impl
+
 		t.Run(impl.name, func(t *testing.T) {
 			gr := newGentleReaderFromBuf(buf)
 			ch := impl.new()
@@ -65,6 +67,8 @@ func BenchmarkChunker(b *testing.B) {
 	b.ReportAllocs()
 
 	for _, impl := range implToBench {
+		impl := impl
+
 		b.Run(impl.name+"/nil", func(b *testing.B) {
 			benchNoAllocs(b, impl.new(), buf)
 		})
@@ -80,6 +84,7 @@ func benchNoAllocs(b *testing.B, ch Chunker, buf []byte) {
 
 	for i := 0; i < b.N; i++ {
 		ch.Reset(bytes.NewReader(buf))
+
 		for err == nil {
 			_, err = ch.Next(nil)
 		}
@@ -91,6 +96,7 @@ func benchPreAlloc(b *testing.B, ch Chunker, buf []byte, size int) {
 
 	for i := 0; i < b.N; i++ {
 		ch.Reset(bytes.NewReader(buf))
+
 		for err == nil {
 			_, err = ch.Next(make([]byte, size))
 		}

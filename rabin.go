@@ -80,7 +80,6 @@ type rabin struct {
 	end   int
 	buf   [bufSize]byte
 
-	pos int
 	min int
 	max int
 
@@ -91,7 +90,6 @@ type rabin struct {
 func (r *rabin) Reset(br io.Reader) {
 	r.r = br
 	r.digest = 0
-	r.pos = 0
 	r.bpos = 0
 	r.end = 0
 	r.slide(1)
