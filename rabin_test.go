@@ -51,6 +51,24 @@ func TestRabin_Next(t *testing.T) {
 	require.Equal(t, len(buf), total)
 }
 
+func TestRabin_SmallChunks(t *testing.T) {
+	const (
+		chunkSize = 128
+		dataSize  = 1 * MiB
+	)
+
+	buf := getRandom(42, dataSize)
+	r := NewRabinWithParams(chunkSize/2, chunkSize)
+	r.Reset(bytes.NewReader(buf))
+
+	for i := 0; i < dataSize; i += chunkSize {
+		c, err := r.Next(make([]byte, KiB))
+		require.NoError(t, err)
+		require.NotNil(t, c, "chunk #%d is nil", i)
+		assert.Equal(t, chunkSize, c.Length, "chunk #%d length", i)
+	}
+}
+
 func TestRabin_MinSize(t *testing.T) {
 	buf := getRandom(1, 100)
 	r := NewRabin()

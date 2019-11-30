@@ -76,13 +76,15 @@ func (r *rabin) Reset(br io.Reader) {
 	r.slide(1)
 }
 
-func NewRabin() *rabin {
-	r := &rabin{
-		min: minSize,
-		max: maxSize,
+func NewRabinWithParams(min, max int) *rabin {
+	return &rabin{
+		min: min,
+		max: max,
 	}
+}
 
-	return r
+func NewRabin() *rabin {
+	return NewRabinWithParams(minSize, maxSize)
 }
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
@@ -97,7 +99,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	}
 
 	count := 1
-	for ; count < minSize; count++ {
+	for ; count < r.min; count++ {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
@@ -126,7 +128,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		}, err
 	}
 
-	for ; count < maxSize; count++ {
+	for ; count < r.max; count++ {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
@@ -148,7 +150,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	return &Chunk{
 		Length: count,
 		Digest: uint64(r.digest),
-		Data:   append(buf, buf[r.start:r.end]...),
+		Data:   append(buf, r.buf[r.start:r.end]...),
 	}, nil
 }
 
