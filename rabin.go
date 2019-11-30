@@ -24,6 +24,17 @@ var (
 	modTable [256]Poly
 )
 
+// calcTables returns 2 tables to speed up calculations of rabin fingerprint.
+// outTable is used for fast remove of the first byte from the sliding window:
+//  Let's assume our data is [b0, b1, ... bN] b ... with sliding window in brackets.
+//  Define Poly(1001..) as a polynomial over GF(2) = 1 + 0*x + 0*x^2 + 1*x^3 ...
+//  H(b0,..bN) is defined over bytes and is equal to Poly(bits of b0, bits of b1...).
+//  Note: Poly's coefficients are individual bits and sliding in H is performed byte-by-byte.
+//  Then H(b1..bN+1) = H(b0..bN) * x^8 + bN+1 with upper 8 bits removed =
+//  = H(b0..bN)*x^8 + bN+1 + H(b0,0,0,0...). The last H is our outTable[b0]
+// modTable is used to replaced modular division with a simple XOR.
+//  It contains precalculated reductions of all polynomials which exceed the
+//  degree of remainder polynomial by no more than 8.
 func calcTables(poly Poly, winSize int) (outTable [256]Poly, modTable [256]Poly) {
 	for b := 0; b < 256; b++ {
 		var h Poly
