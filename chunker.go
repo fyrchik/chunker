@@ -4,8 +4,6 @@ import "io"
 
 // Chunk is a generic chunk structure.
 type Chunk struct {
-	// Length is the length of the chunk.
-	Length int
 	// Digest is a checksum of a chunk.
 	Digest uint64
 	// Data contains chunk's contents.

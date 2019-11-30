@@ -53,6 +53,7 @@ type rabin struct {
 	window [winSize]byte
 	wpos   int
 	r      io.Reader
+	err    error
 
 	bpos  int
 	start int
@@ -71,8 +72,8 @@ func (r *rabin) Reset(br io.Reader) {
 	r.r = br
 	r.digest = 0
 	r.pos = 0
-	r.bpos = bufSize
-	r.end = bufSize
+	r.bpos = 0
+	r.end = 0
 	r.slide(1)
 }
 
@@ -88,82 +89,80 @@ func NewRabin() *rabin {
 }
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
-	var err error
-
-	buf = buf[:0]
-
 	if r.bpos == r.end {
-		if err = r.updateBuf(); err != nil && err != io.EOF {
-			return nil, err
+		if r.err != nil {
+			return nil, r.err
+		}
+
+		r.updateBuf()
+		if r.err != nil && r.err != io.EOF || r.end == 0 {
+			return nil, r.err
 		}
 	}
 
+	r.start = r.bpos
+	buf = buf[:0]
 	count := 1
-	for ; count < r.min; count++ {
+
+	for ; count <= r.min; count++ {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
-		if r.bpos == r.end {
-			if err == io.EOF {
+		if r.bpos == r.end && count < r.min-1 {
+			if r.err == io.EOF {
 				break
 			}
 
-			buf = append(buf, r.buf[r.start:]...)
+			buf = append(buf, r.buf[r.start:r.bpos]...)
 
-			if err = r.updateBuf(); err != nil && err != io.EOF {
-				return nil, err
+			r.updateBuf()
+			if r.err != nil && r.err != io.EOF {
+				return nil, r.err
 			}
 		}
 	}
 
-	if r.digest&mask == 0 || (r.bpos == r.end && err == io.EOF) {
-		if r.digest&mask == 0 {
-			err = nil
-		}
-
+	if r.digest&mask == 0 || (r.bpos == r.end && r.err == io.EOF) {
 		return &Chunk{
-			Length: count,
 			Digest: uint64(r.digest),
-			Data:   buf,
-		}, err
+			Data:   append(buf, r.buf[r.start:r.bpos]...),
+		}, nil
 	}
 
-	for ; count < r.max; count++ {
+	for ; count <= r.max; count++ {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
 		if r.digest&mask == 0 {
 			return &Chunk{
-				Length: count,
 				Digest: uint64(r.digest),
 				Data:   append(buf, r.buf[r.start:r.bpos]...),
-			}, err
+			}, nil
 		} else if r.bpos == r.end {
-			if err = r.updateBuf(); err == io.EOF {
+			buf = append(buf, r.buf[r.start:r.bpos]...)
+			r.updateBuf()
+			if r.err == io.EOF {
 				break
-			} else if err != nil {
-				return nil, err
+			} else if r.err != nil {
+				return nil, r.err
 			}
 		}
 	}
 
 	return &Chunk{
-		Length: count,
 		Digest: uint64(r.digest),
-		Data:   append(buf, r.buf[r.start:r.end]...),
-	}, err
+		Data:   append(buf, r.buf[r.start:r.bpos]...),
+	}, nil
 }
 
-func (r *rabin) updateBuf() (err error) {
+func (r *rabin) updateBuf() {
 	r.bpos = 0
 	r.start = 0
-	r.end, err = io.ReadFull(r.r, r.buf[:])
+	r.end, r.err = io.ReadFull(r.r, r.buf[:])
 
-	if err == io.ErrUnexpectedEOF {
-		err = io.EOF
+	if r.err == io.ErrUnexpectedEOF {
+		r.err = io.EOF
 	}
-
-	return err
 }
 
 func (r *rabin) append(b byte) {

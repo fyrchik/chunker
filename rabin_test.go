@@ -35,55 +35,82 @@ var chunks = []chunk{
 func TestRabin_Next(t *testing.T) {
 	buf := getRandom(42, 16*MiB)
 	r := NewRabin()
-	r.Reset(bytes.NewReader(buf))
+	gr := newGentleReaderFromBuf(buf)
+	r.Reset(gr)
 
 	var total int
 
 	for i, ch := range chunks {
 		c, err := r.Next(make([]byte, 2*MiB))
-		if i == len(chunks)-1 {
-			require.Equal(t, io.EOF, err)
-		} else {
-			require.NoError(t, err)
-		}
-
+		require.NoError(t, err)
 		require.NotNil(t, c, "chunk #%d is nil", i)
-		assert.Equal(t, ch.len, c.Length, "chunk #%d length", i)
+		assert.Equal(t, ch.len, len(c.Data), "chunk #%d length", i)
 		assert.Equal(t, ch.digest, c.Digest, "chunk #%d digest", i)
 		total += ch.len
 	}
 
 	require.Equal(t, len(buf), total)
+
+	c, err := r.Next(make([]byte, 2*MiB))
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, c)
+	require.False(t, gr.Used)
+
+	c, err = r.Next(nil)
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, c)
+	require.False(t, gr.Used)
+}
+
+func TestRabin_EmptyReader(t *testing.T) {
+	r := NewRabin()
+	r.Reset(bytes.NewReader(nil))
+
+	c, err := r.Next(nil)
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, c)
 }
 
 func TestRabin_SmallChunks(t *testing.T) {
 	const (
-		chunkSize = 128
-		dataSize  = 1 * MiB
+		chunkSize = 16
+		dataSize  = 128
 	)
 
 	buf := getRandom(42, dataSize)
 	r := NewRabinWithParams(chunkSize/2, chunkSize)
-	r.Reset(bytes.NewReader(buf))
+	gr := newGentleReaderFromBuf(buf)
+	r.Reset(gr)
 
-	for i := 0; i < dataSize; i += chunkSize {
+	n := dataSize / chunkSize
+	for i := 0; i < n; i++ {
 		c, err := r.Next(make([]byte, KiB))
 		require.NoError(t, err)
 		require.NotNil(t, c, "chunk #%d is nil", i)
-		assert.Equal(t, chunkSize, c.Length, "chunk #%d length", i)
+		require.Equal(t, chunkSize, len(c.Data), "chunk #%d length", i)
 	}
+
+	c, err := r.Next(make([]byte, 1))
+	assert.Equal(t, io.EOF, err)
+	assert.Nil(t, c)
 }
 
 func TestRabin_MinSize(t *testing.T) {
 	buf := getRandom(1, 100)
 	r := NewRabin()
-	r.Reset(bytes.NewReader(buf))
+	gr := newGentleReaderFromBuf(buf)
+	r.Reset(gr)
 
 	c, err := r.Next(make([]byte, KiB))
-	require.Equal(t, io.EOF, err)
+	require.NoError(t, err)
 	require.NotNil(t, c)
-	require.Equal(t, 100, c.Length)
+	require.Equal(t, 100, len(c.Data))
 	require.EqualValues(t, 0x78a069e0967f2, c.Digest)
+
+	c, err = r.Next(make([]byte, KiB))
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, c)
+	require.False(t, gr.Used)
 }
 
 func BenchmarkRabin_Next(b *testing.B) {
@@ -99,29 +126,33 @@ func BenchmarkRabin_Next(b *testing.B) {
 		r := NewRabinWithParams(chunkSize/2, chunkSize)
 
 		b.Run("no allocs", func(b *testing.B) {
-			benchNoAllocs(b, r, buf, dataSize/chunkSize)
+			benchNoAllocs(b, r, buf)
 		})
 
 		b.Run("pre alloc", func(b *testing.B) {
-			benchPreAlloc(b, r, buf, dataSize/chunkSize, chunkSize)
+			benchPreAlloc(b, r, buf, chunkSize)
 		})
 	})
 }
 
-func benchNoAllocs(b *testing.B, r *rabin, buf []byte, n int) {
+func benchNoAllocs(b *testing.B, r *rabin, buf []byte) {
+	var err error
+
 	for i := 0; i < b.N; i++ {
 		r.Reset(bytes.NewReader(buf))
-		for i := 0; i < n; i++ {
-			_, _ = r.Next(nil)
+		for err == nil {
+			_, err = r.Next(nil)
 		}
 	}
 }
 
-func benchPreAlloc(b *testing.B, r *rabin, buf []byte, n, size int) {
+func benchPreAlloc(b *testing.B, r *rabin, buf []byte, size int) {
+	var err error
+
 	for i := 0; i < b.N; i++ {
 		r.Reset(bytes.NewReader(buf))
-		for i := 0; i < n; i++ {
-			_, _ = r.Next(make([]byte, size))
+		for err == nil {
+			_, err = r.Next(make([]byte, size))
 		}
 	}
 }
