@@ -144,50 +144,6 @@ func TestRabin_MinSize(t *testing.T) {
 	require.False(t, gr.Used)
 }
 
-func BenchmarkRabin_Next(b *testing.B) {
-	b.ReportAllocs()
-
-	b.Run("small chunks", func(b *testing.B) {
-		const (
-			chunkSize = 128
-			dataSize  = 2 * KiB
-		)
-
-		buf := getRandom(1, dataSize)
-		r := NewRabinWithParams(chunkSize/2, chunkSize)
-
-		b.Run("no allocs", func(b *testing.B) {
-			benchNoAllocs(b, r, buf)
-		})
-
-		b.Run("pre alloc", func(b *testing.B) {
-			benchPreAlloc(b, r, buf, chunkSize)
-		})
-	})
-}
-
-func benchNoAllocs(b *testing.B, r *rabin, buf []byte) {
-	var err error
-
-	for i := 0; i < b.N; i++ {
-		r.Reset(bytes.NewReader(buf))
-		for err == nil {
-			_, err = r.Next(nil)
-		}
-	}
-}
-
-func benchPreAlloc(b *testing.B, r *rabin, buf []byte, size int) {
-	var err error
-
-	for i := 0; i < b.N; i++ {
-		r.Reset(bytes.NewReader(buf))
-		for err == nil {
-			_, err = r.Next(make([]byte, size))
-		}
-	}
-}
-
 func getRandom(seed int64, count int) []byte {
 	buf := make([]byte, count)
 	rnd := rand.New(rand.NewSource(seed))
