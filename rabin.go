@@ -90,8 +90,7 @@ func NewRabin() *rabin {
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	if r.end == 0 || r.bpos == r.end {
-		r.updateBuf()
-		if r.err != nil && r.err != io.EOF || r.end == 0 {
+		if !r.updateBuf() {
 			return nil, r.err
 		}
 	}
@@ -104,29 +103,23 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
-		if r.bpos == r.end && count < r.min-1 {
-			if r.err != nil {
-				break
-			}
-
+		// if chunk is still less than minimal size
+		// but more data needs to be read
+		if r.bpos == r.end {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
 
-			r.updateBuf()
-			if r.err != nil && r.err != io.EOF {
-				return nil, r.err
+			if count < r.min-1 && !r.updateBuf() {
+				if r.err != io.EOF {
+					return nil, r.err
+				}
+
+				return r.chunk(buf), nil
 			}
 		}
 	}
 
-	if r.err != nil && r.err != io.EOF {
-		return nil, r.err
-	}
-
-	if r.digest&mask == 0 || (r.bpos == r.end && r.err == io.EOF) {
-		return &Chunk{
-			Digest: uint64(r.digest),
-			Data:   append(buf, r.buf[r.start:r.bpos]...),
-		}, nil
+	if r.digest&mask == 0 || (r.bpos == r.end && !r.updateBuf() && r.err == io.EOF) {
+		return r.chunk(buf), nil
 	}
 
 	for ; count <= r.max; count++ {
@@ -134,38 +127,48 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		r.bpos++
 
 		if r.digest&mask == 0 {
-			return &Chunk{
-				Digest: uint64(r.digest),
-				Data:   append(buf, r.buf[r.start:r.bpos]...),
-			}, nil
+			return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
 		} else if r.bpos == r.end {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
+			r.start = r.bpos
 
-			r.updateBuf()
-			if r.err != nil {
-				break
+			if !r.updateBuf() {
+				if r.err == io.EOF {
+					break
+				}
+
+				return nil, r.err
 			}
 		}
 	}
 
-	return &Chunk{
-		Digest: uint64(r.digest),
-		Data:   append(buf, r.buf[r.start:r.bpos]...),
-	}, nil
+	return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
 }
 
-func (r *rabin) updateBuf() {
+// updateBuf reads more data from buffer and returns
+// true is some data was read.
+func (r *rabin) updateBuf() bool {
 	r.bpos = 0
 	r.end = 0
 	r.start = 0
 
 	if r.err != nil {
-		return
+		return false
 	}
+
 	r.end, r.err = io.ReadFull(r.r, r.buf[:])
 
 	if r.err == io.ErrUnexpectedEOF {
 		r.err = io.EOF
+	}
+
+	return r.end != 0
+}
+
+func (r *rabin) chunk(buf []byte) *Chunk {
+	return &Chunk{
+		Digest: uint64(r.digest),
+		Data:   buf,
 	}
 }
 
