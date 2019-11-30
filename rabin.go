@@ -5,16 +5,18 @@ import (
 	"math/bits"
 )
 
+const defaultPoly = Poly(0x3DA3358B4DC173)
+
 const (
-	defaultPoly = Poly(0x3DA3358B4DC173)
-	minSize     = 1 << 19
-	maxSize     = 1 << 23
-	avgSize     = 1 << 20
-	mask        = avgSize - 1
-	winSize     = 64
-	bufSize     = 2 * MiB
+	minSize = 1 << 19
+	maxSize = 1 << 23
+	avgSize = 1 << 20
+	mask    = avgSize - 1
+	winSize = 64
+	bufSize = 2 * MiB
 )
 
+// Poly represents polynomial over GF(2).
 type Poly uint64
 
 var (
