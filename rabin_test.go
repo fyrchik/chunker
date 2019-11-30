@@ -30,7 +30,7 @@ var chunks = []chunk{
 	{len: 1963437, digest: 0x00071a431904a02e},
 }
 
-func TestRabin_nextChunk(t *testing.T) {
+func TestRabin_Next(t *testing.T) {
 	buf := getRandom(42, 16*MiB)
 	r := NewRabin()
 	r.Reset(buf)
@@ -46,6 +46,17 @@ func TestRabin_nextChunk(t *testing.T) {
 	}
 
 	require.Equal(t, len(buf), total)
+}
+
+func TestRabin_MinSize(t *testing.T) {
+	buf := getRandom(1, 100)
+	r := NewRabin()
+	r.Reset(buf)
+
+	c, err := r.Next(make([]byte, KiB))
+	require.NoError(t, err)
+	require.Equal(t, 100, c.Length)
+	require.EqualValues(t, 0x78a069e0967f2, c.Digest)
 }
 
 func getRandom(seed int64, count int) []byte {
