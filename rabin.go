@@ -24,7 +24,7 @@ var (
 	modTable [256]Poly
 )
 
-func calcTables(poly Poly, winSize int) {
+func calcTables(poly Poly, winSize int) (outTable [256]Poly, modTable [256]Poly) {
 	for b := 0; b < 256; b++ {
 		var h Poly
 
@@ -43,10 +43,12 @@ func calcTables(poly Poly, winSize int) {
 		p := Poly(b) << k
 		modTable[b] = mod(p, poly) | p
 	}
+
+	return outTable, modTable
 }
 
 func init() {
-	calcTables(defaultPoly, winSize)
+	outTable, modTable = calcTables(defaultPoly, winSize)
 }
 
 type rabin struct {
