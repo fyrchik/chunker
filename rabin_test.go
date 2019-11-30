@@ -1,7 +1,9 @@
 package chunker
 
 import (
+	"bytes"
 	"encoding/binary"
+	"io"
 	"math/rand"
 	"testing"
 
@@ -33,13 +35,14 @@ var chunks = []chunk{
 func TestRabin_Next(t *testing.T) {
 	buf := getRandom(42, 16*MiB)
 	r := NewRabin()
-	r.Reset(buf)
+	r.Reset(bytes.NewReader(buf))
 
 	var total int
 
 	for i, ch := range chunks {
 		c, err := r.Next(make([]byte, 2*MiB))
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, c, "chunk #%d is nil", i)
 		assert.Equal(t, ch.len, c.Length, "chunk #%d length", i)
 		assert.Equal(t, ch.digest, c.Digest, "chunk #%d digest", i)
 		total += ch.len
@@ -51,10 +54,11 @@ func TestRabin_Next(t *testing.T) {
 func TestRabin_MinSize(t *testing.T) {
 	buf := getRandom(1, 100)
 	r := NewRabin()
-	r.Reset(buf)
+	r.Reset(bytes.NewReader(buf))
 
 	c, err := r.Next(make([]byte, KiB))
-	require.NoError(t, err)
+	require.Equal(t, io.EOF, err)
+	require.NotNil(t, c)
 	require.Equal(t, 100, c.Length)
 	require.EqualValues(t, 0x78a069e0967f2, c.Digest)
 }

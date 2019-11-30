@@ -1,6 +1,7 @@
 package chunker
 
 import (
+	"io"
 	"math/bits"
 )
 
@@ -11,6 +12,7 @@ const (
 	avgSize     = 1 << 20
 	mask        = avgSize - 1
 	winSize     = 64
+	bufSize     = 2 * MiB
 )
 
 type Poly uint64
@@ -48,22 +50,27 @@ func init() {
 type rabin struct {
 	window [winSize]byte
 	wpos   int
-	data   []byte // TOOD replace with io.Reader
+	r      io.Reader
 
-	pos   int
-	min   int
-	max   int
+	bpos  int
 	start int
+	end   int
+	buf   [bufSize]byte
+
+	pos int
+	min int
+	max int
 
 	digest Poly
 }
 
 // Reset implements Chunker interface.
-func (r *rabin) Reset(br []byte) {
-	r.data = br
+func (r *rabin) Reset(br io.Reader) {
+	r.r = br
 	r.digest = 0
 	r.pos = 0
-	r.start = 0
+	r.bpos = bufSize
+	r.end = bufSize
 	r.slide(1)
 }
 
@@ -77,45 +84,82 @@ func NewRabin() *rabin {
 }
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
+	var err error
+
 	buf = buf[:0]
 
-	r.start = r.pos
-	end := min(r.start+minSize, len(r.data))
-
-	for ; r.pos < end; r.pos++ {
-		r.slide(r.data[r.pos])
-	}
-
-	if r.digest&mask == 0 || end == len(r.data) {
-		return &Chunk{
-			Length: r.pos - r.start,
-			Digest: uint64(r.digest),
-			Data:   append(buf, r.data[r.start:r.pos]...),
-		}, nil
-	}
-
-	end = min(r.start+maxSize, len(r.data))
-	for ; r.pos < end; r.pos++ {
-		r.slide(r.data[r.pos])
-
-		if r.digest&mask == 0 {
-			r.pos++
-
-			return &Chunk{
-				Length: r.pos - r.start,
-				Digest: uint64(r.digest),
-				Data:   append(buf, r.data[r.start:r.pos]...),
-			}, nil
+	if r.bpos == r.end {
+		if err = r.updateBuf(); err != nil && err != io.EOF {
+			return nil, err
 		}
 	}
 
-	r.pos = len(r.data)
+	count := 1
+	for ; count < minSize; count++ {
+		r.slide(r.buf[r.bpos])
+		r.bpos++
+
+		if r.bpos == r.end {
+			if err == io.EOF {
+				break
+			}
+
+			buf = append(buf, r.buf[r.start:]...)
+
+			if err = r.updateBuf(); err != nil && err != io.EOF {
+				return nil, err
+			}
+		}
+	}
+
+	if r.digest&mask == 0 || (r.bpos == r.end && err == io.EOF) {
+		if r.digest&mask == 0 {
+			err = nil
+		}
+
+		return &Chunk{
+			Length: count,
+			Digest: uint64(r.digest),
+			Data:   buf,
+		}, err
+	}
+
+	for ; count < maxSize; count++ {
+		r.slide(r.buf[r.bpos])
+		r.bpos++
+
+		if r.digest&mask == 0 {
+			return &Chunk{
+				Length: count,
+				Digest: uint64(r.digest),
+				Data:   append(buf, r.buf[r.start:r.bpos]...),
+			}, nil
+		} else if r.bpos == r.end {
+			if err = r.updateBuf(); err == io.EOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	return &Chunk{
-		Length: r.pos - r.start,
+		Length: count,
 		Digest: uint64(r.digest),
-		Data:   append(buf, r.data[r.start:]...),
+		Data:   append(buf, buf[r.start:r.end]...),
 	}, nil
+}
+
+func (r *rabin) updateBuf() (err error) {
+	r.bpos = 0
+	r.start = 0
+	r.end, err = io.ReadFull(r.r, r.buf[:])
+
+	if err == io.ErrUnexpectedEOF {
+		err = io.EOF
+	}
+
+	return err
 }
 
 func (r *rabin) append(b byte) {
