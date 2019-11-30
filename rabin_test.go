@@ -106,17 +106,20 @@ func TestRabin_BadReader(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, chunkSize, len(c.Data))
 
-	c, err = r.Next(nil)
-	require.Error(t, err)
-	require.Nil(t, c)
-	require.False(t, gr.Used)
+	wellBehaved(t, gr, r)
 
 	chunkSize = 4 * MiB
 	r = NewRabinWithParams(chunkSize, chunkSize)
 	gr = newErrorReaderFromBuf(3*MiB, buf)
 	r.Reset(gr)
 
-	c, err = r.Next(nil)
+	wellBehaved(t, gr, r)
+}
+
+// wellBehaved checks if Next method doesn't use reader
+// after it was fully consumed.
+func wellBehaved(t *testing.T, gr *gentleReader, r *rabin) {
+	c, err := r.Next(nil)
 	require.Error(t, err)
 	require.Nil(t, c)
 
@@ -141,7 +144,8 @@ func TestRabin_MinSize(t *testing.T) {
 	c, err = r.Next(make([]byte, KiB))
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, c)
-	require.False(t, gr.Used)
+
+	wellBehaved(t, gr, r)
 }
 
 func getRandom(seed int64, count int) []byte {
