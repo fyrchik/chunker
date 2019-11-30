@@ -180,14 +180,6 @@ func (r *rabin) slide(b byte) {
 	r.append(b)
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
 // deg returns degree of a polynomial p
 // and -1 if p == 0
 func deg(p Poly) int {
