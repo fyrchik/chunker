@@ -95,6 +95,37 @@ func TestRabin_SmallChunks(t *testing.T) {
 	assert.Nil(t, c)
 }
 
+func TestRabin_BadReader(t *testing.T) {
+	chunkSize := 2 * MiB
+	buf := getRandom(2, 16*MiB)
+	r := NewRabinWithParams(chunkSize, chunkSize)
+	gr := &gentleReader{Reader: newErrorReaderFromBuf(3*MiB, buf)}
+	r.Reset(gr)
+
+	c, err := r.Next(nil)
+	require.NoError(t, err)
+	require.Equal(t, chunkSize, len(c.Data))
+
+	c, err = r.Next(nil)
+	require.Error(t, err)
+	require.Nil(t, c)
+	require.False(t, gr.Used)
+
+	chunkSize = 4 * MiB
+	r = NewRabinWithParams(chunkSize, chunkSize)
+	gr = &gentleReader{Reader: newErrorReaderFromBuf(3*MiB, buf)}
+	r.Reset(gr)
+
+	c, err = r.Next(nil)
+	require.Error(t, err)
+	require.Nil(t, c)
+
+	c, err = r.Next(nil)
+	require.Error(t, err)
+	require.Nil(t, c)
+	require.False(t, gr.Used)
+}
+
 func TestRabin_MinSize(t *testing.T) {
 	buf := getRandom(1, 100)
 	r := NewRabin()

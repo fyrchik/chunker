@@ -2,6 +2,7 @@ package chunker
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -13,6 +14,12 @@ type gentleReader struct {
 	io.Reader
 	Err  error
 	Used bool
+}
+
+type errorReader struct {
+	io.Reader
+	index int
+	after int
 }
 
 func newGentleReaderFromBuf(buf []byte) *gentleReader {
@@ -30,4 +37,27 @@ func (r *gentleReader) Read(p []byte) (n int, err error) {
 	n, r.Err = r.Reader.Read(p)
 
 	return n, r.Err
+}
+
+func newErrorReaderFromBuf(after int, buf []byte) *errorReader {
+	return &errorReader{
+		after:  after,
+		Reader: bytes.NewReader(buf),
+	}
+}
+
+// Read implements io.Reader interface.
+func (r *errorReader) Read(p []byte) (n int, err error) {
+	if r.index == r.after {
+		return 0, errors.New("error on read")
+	}
+
+	if r.index+len(p) > r.after {
+		p = p[:r.after-r.index]
+	}
+
+	n, err = r.Reader.Read(p)
+	r.index += n
+
+	return
 }

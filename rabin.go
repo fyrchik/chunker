@@ -90,10 +90,6 @@ func NewRabin() *rabin {
 
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	if r.end == 0 || r.bpos == r.end {
-		if r.err != nil {
-			return nil, r.err
-		}
-
 		r.updateBuf()
 		if r.err != nil && r.err != io.EOF || r.end == 0 {
 			return nil, r.err
@@ -140,6 +136,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 			}, nil
 		} else if r.bpos == r.end {
 			buf = append(buf, r.buf[r.start:r.bpos]...)
+
 			r.updateBuf()
 			if r.err == io.EOF {
 				break
@@ -157,7 +154,12 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 
 func (r *rabin) updateBuf() {
 	r.bpos = 0
+	r.end = 0
 	r.start = 0
+
+	if r.err != nil {
+		return
+	}
 	r.end, r.err = io.ReadFull(r.r, r.buf[:])
 
 	if r.err == io.ErrUnexpectedEOF {
