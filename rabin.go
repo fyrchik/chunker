@@ -72,13 +72,10 @@ func init() {
 type rabin struct {
 	window [winSize]byte
 	wpos   int
-	r      io.Reader
-	err    error
 
-	bpos  int
 	start int
-	end   int
-	buf   [bufSize]byte
+	ch    []byte
+	lb    LazyBuf
 
 	min int
 	max int
@@ -88,10 +85,16 @@ type rabin struct {
 
 // Reset implements Chunker interface.
 func (r *rabin) Reset(br io.Reader) {
-	r.r = br
+	r.lb = LazyBuf{
+		Reader: br,
+		onUpdate: func(b *LazyBuf) {
+			r.ch = append(r.ch, b.Buf[r.start:]...)
+			r.start = 0
+		},
+	}
+	r.lb.Update()
+
 	r.digest = 0
-	r.bpos = 0
-	r.end = 0
 	r.slide(1)
 }
 
@@ -111,87 +114,55 @@ func NewRabin() *rabin {
 
 // Next implements Chunker interface.
 func (r *rabin) Next(buf []byte) (*Chunk, error) {
-	if r.end == 0 || r.bpos == r.end {
-		if !r.updateBuf() {
-			return nil, r.err
-		}
-	}
+	r.start = r.lb.Pos
+	r.ch = buf[:0]
 
-	r.start = r.bpos
-	buf = buf[:0]
 	count := 1
-
 	for ; count <= r.min; count++ {
-		r.slide(r.buf[r.bpos])
-		r.bpos++
-
-		// if chunk is still less than minimal size
-		// but more data needs to be read
-		if r.bpos == r.end {
-			buf = append(buf, r.buf[r.start:r.bpos]...)
-
-			if count < r.min && !r.updateBuf() {
-				if r.err != io.EOF {
-					return nil, r.err
+		b := r.lb.Next()
+		if r.lb.err != nil {
+			if r.lb.err == io.EOF {
+				if len(r.ch) == 0 && count == 1 {
+					return nil, r.lb.err
 				}
 
-				return r.chunk(buf), nil
+				return r.chunk(), nil
 			}
+
+			return nil, r.lb.err
 		}
+
+		r.slide(b)
 	}
 
-	if r.digest&mask == 0 || (r.bpos == r.end && !r.updateBuf() && r.err == io.EOF) {
-		return r.chunk(buf), nil
+	if r.digest&mask == 0 {
+		return r.chunk(), nil
 	}
 
 	for ; count <= r.max; count++ {
-		r.slide(r.buf[r.bpos])
-		r.bpos++
+		b := r.lb.Next()
+		if r.lb.err != nil {
+			if r.lb.err == io.EOF {
+				return r.chunk(), nil
+			}
+
+			return nil, r.lb.err
+		}
+
+		r.slide(b)
 
 		if r.digest&mask == 0 {
-			return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
-		} else if r.bpos == r.end {
-			buf = append(buf, r.buf[r.start:r.bpos]...)
-
-			if count == r.max {
-				return r.chunk(buf), nil
-			} else if count < r.max && !r.updateBuf() {
-				if r.err != io.EOF {
-					return nil, r.err
-				}
-
-				return r.chunk(buf), nil
-			}
+			return r.chunk(), nil
 		}
 	}
 
-	return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
+	return r.chunk(), nil
 }
 
-// updateBuf reads more data from buffer and returns
-// true is some data was read.
-func (r *rabin) updateBuf() bool {
-	r.bpos = 0
-	r.end = 0
-	r.start = 0
-
-	if r.err != nil {
-		return false
-	}
-
-	r.end, r.err = io.ReadFull(r.r, r.buf[:])
-
-	if r.err == io.ErrUnexpectedEOF {
-		r.err = io.EOF
-	}
-
-	return r.end != 0
-}
-
-func (r *rabin) chunk(buf []byte) *Chunk {
+func (r *rabin) chunk() *Chunk {
 	return &Chunk{
 		Digest: uint64(r.digest),
-		Data:   buf,
+		Data:   append(r.ch, r.lb.Buf[r.start:r.lb.Pos]...),
 	}
 }
 
