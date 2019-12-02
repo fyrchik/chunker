@@ -80,6 +80,8 @@ type rabin struct {
 	end   int
 	buf   [bufSize]byte
 
+	lastChunk []byte
+
 	min int
 	max int
 
@@ -118,7 +120,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	}
 
 	r.start = r.bpos
-	buf = buf[:0]
+	r.lastChunk = buf[:0]
 	count := 1
 
 	for ; count <= r.min; count++ {
@@ -127,57 +129,49 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 
 		// if chunk is still less than minimal size
 		// but more data needs to be read
-		if r.bpos == r.end {
-			buf = append(buf, r.buf[r.start:r.bpos]...)
-
-			if count < r.min && !r.updateBuf() {
-				if r.err != io.EOF {
-					return nil, r.err
-				}
-
-				return r.chunk(buf), nil
-			}
+		if r.bpos == r.end && count < r.min && !r.updateBuf() {
+			return r.chomp()
 		}
 	}
 
-	if r.digest&mask == 0 || (r.bpos == r.end && !r.updateBuf() && r.err == io.EOF) {
-		return r.chunk(buf), nil
+	if r.digest&mask == 0 || r.bpos == r.end && !r.updateBuf() && r.err == io.EOF {
+		return r.chunk(), nil
 	}
 
 	for ; count <= r.max; count++ {
 		r.slide(r.buf[r.bpos])
 		r.bpos++
 
-		if r.digest&mask == 0 {
-			return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
-		} else if r.bpos == r.end {
-			buf = append(buf, r.buf[r.start:r.bpos]...)
-
-			if count == r.max {
-				return r.chunk(buf), nil
-			} else if count < r.max && !r.updateBuf() {
-				if r.err != io.EOF {
-					return nil, r.err
-				}
-
-				return r.chunk(buf), nil
-			}
+		if r.digest&mask == 0 || count == r.max {
+			return r.chunk(), nil
+		} else if r.bpos == r.end && !r.updateBuf() {
+			return r.chomp()
 		}
 	}
 
-	return r.chunk(append(buf, r.buf[r.start:r.bpos]...)), nil
+	return r.chunk(), nil
+}
+
+func (r *rabin) chomp() (*Chunk, error) {
+	if r.err == nil || r.err == io.EOF {
+		return r.chunk(), nil
+	}
+
+	return nil, r.err
 }
 
 // updateBuf reads more data from buffer and returns
 // true is some data was read.
 func (r *rabin) updateBuf() bool {
-	r.bpos = 0
-	r.end = 0
-	r.start = 0
-
 	if r.err != nil {
 		return false
 	}
+
+	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+
+	r.bpos = 0
+	r.end = 0
+	r.start = 0
 
 	r.end, r.err = io.ReadFull(r.r, r.buf[:])
 
@@ -188,10 +182,12 @@ func (r *rabin) updateBuf() bool {
 	return r.end != 0
 }
 
-func (r *rabin) chunk(buf []byte) *Chunk {
+func (r *rabin) chunk() *Chunk {
+	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+
 	return &Chunk{
 		Digest: uint64(r.digest),
-		Data:   buf,
+		Data:   r.lastChunk,
 	}
 }
 
