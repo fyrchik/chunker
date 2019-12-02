@@ -6,6 +6,8 @@ Currently implemented:
 - Rabin chunking method
     - https://en.wikipedia.org/wiki/Rabin_fingerprint
     - https://github.com/fd0/rabin-cdc/
+- Gear-based chunking
+    - https://www.sciencedirect.com/science/article/pii/S0166531614000790
 
 ## Design
 1. All work is done through `Chunker` interface. `Next` method should return `nil` error
