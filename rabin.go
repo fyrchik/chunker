@@ -26,11 +26,6 @@ const (
 // Poly represents polynomial over GF(2).
 type Poly uint64
 
-var (
-	outTable [256]Poly
-	modTable [256]Poly
-)
-
 // calcTables returns 2 tables to speed up calculations of rabin fingerprint.
 // outTable is used for fast remove of the first byte from the sliding window:
 //  Let's assume our data is [b0, b1, ... bN] b ... with sliding window in brackets.
@@ -65,10 +60,6 @@ func calcTables(poly Poly, winSize int) (outTable [256]Poly, modTable [256]Poly)
 	return outTable, modTable
 }
 
-func init() {
-	outTable, modTable = calcTables(defaultPoly, winSize)
-}
-
 type rabin struct {
 	window [winSize]byte
 	wpos   int
@@ -79,6 +70,10 @@ type rabin struct {
 	start int
 	end   int
 	buf   [bufSize]byte
+
+	poly Poly
+	out  [256]Poly
+	mod  [256]Poly
 
 	lastChunk []byte
 
@@ -100,10 +95,14 @@ func (r *rabin) Reset(br io.Reader) {
 // NewRabinWithParams returns rabin Chunker with specified
 // min and max chunks sizes.
 func NewRabinWithParams(min, max int) *rabin {
-	return &rabin{
-		min: min,
-		max: max,
+	r := &rabin{
+		min:  min,
+		max:  max,
+		poly: defaultPoly,
 	}
+	r.out, r.mod = calcTables(defaultPoly, winSize)
+
+	return r
 }
 
 // NewRabin returns default rabin Chunker.
@@ -192,16 +191,16 @@ func (r *rabin) chunk() *Chunk {
 }
 
 func (r *rabin) append(b byte) {
-	index := r.digest >> (deg(defaultPoly) - 8)
+	index := r.digest >> (deg(r.poly) - 8)
 	r.digest <<= 8
 	r.digest |= Poly(b)
-	r.digest ^= modTable[index]
+	r.digest ^= r.mod[index]
 }
 
 func (r *rabin) slide(b byte) {
 	out := r.window[r.wpos]
 	r.window[r.wpos] = b
-	r.digest ^= outTable[out]
+	r.digest ^= r.out[out]
 	r.wpos = (r.wpos + 1) % winSize
 	r.append(b)
 }
