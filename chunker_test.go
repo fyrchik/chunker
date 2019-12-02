@@ -66,7 +66,7 @@ func TestChunker_Correct(t *testing.T) {
 }
 
 func BenchmarkChunker(b *testing.B) {
-	const allocSize = 1 * MiB
+	const allocSize = avgSize
 
 	buf := getRandom(1, 32*MiB)
 
