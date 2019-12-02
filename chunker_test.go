@@ -2,6 +2,7 @@ package chunker
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,11 @@ type impl struct {
 
 var implToBench = []impl{
 	{"rabin", func() Chunker { return NewRabin() }},
+	{"gear", func() Chunker {
+		return &gear{
+			table: newGearTable(rand.New(rand.NewSource(0))),
+		}
+	}},
 }
 
 var implToTest = append(implToBench, []impl{
