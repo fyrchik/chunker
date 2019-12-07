@@ -101,7 +101,7 @@ func TestRabin_BadReader(t *testing.T) {
 	t.Run("error at second buffer fill", func(t *testing.T) {
 		chunkSize := bufSize
 		r := NewRabinWithParams(chunkSize, chunkSize)
-		gr := newErrorReaderFromBuf(3*MiB, buf)
+		gr := newErrorReaderFromBuf(bufSize+bufSize/2, buf)
 		r.Reset(gr)
 
 		c, err := r.Next(nil)

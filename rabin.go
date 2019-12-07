@@ -20,7 +20,7 @@ const (
 	// winSize is default window size
 	winSize = 64
 	// bufSize is default internal buffer size
-	bufSize = 2 * MiB
+	bufSize = 512 * KiB
 )
 
 // Poly represents polynomial over GF(2).
