@@ -63,8 +63,8 @@ func (g *gear) Next(buf []byte) (*Chunk, error) {
 
 func (g *gear) chunk(buf []byte) *Chunk {
 	return &Chunk{
-		Digest: uint64(g.digest),
-		Data:   buf,
+		Cut:  uint64(g.digest),
+		Data: buf,
 	}
 }
 

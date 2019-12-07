@@ -187,8 +187,8 @@ func (r *rabin) chunk() (*Chunk, error) {
 	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
 
 	return &Chunk{
-		Digest: uint64(r.digest),
-		Data:   r.lastChunk,
+		Cut:  uint64(r.digest),
+		Data: r.lastChunk,
 	}, nil
 }
 

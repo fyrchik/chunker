@@ -45,7 +45,7 @@ func TestRabin_Next(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, c, "chunk #%d is nil", i)
 		assert.Equal(t, ch.len, len(c.Data), "chunk #%d length", i)
-		assert.Equal(t, ch.digest, c.Digest, "chunk #%d digest", i)
+		assert.Equal(t, ch.digest, c.Cut, "chunk #%d digest", i)
 		total += ch.len
 	}
 
@@ -158,7 +158,7 @@ func TestRabin_MinSize(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	require.Equal(t, 100, len(c.Data))
-	require.EqualValues(t, 0x78a069e0967f2, c.Digest)
+	require.EqualValues(t, 0x78a069e0967f2, c.Cut)
 
 	c, err = r.Next(make([]byte, KiB))
 	require.Equal(t, io.EOF, err)
