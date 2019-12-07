@@ -66,10 +66,9 @@ type rabin struct {
 	r      io.Reader
 	err    error
 
-	bpos  int
-	start int
-	end   int
-	buf   [bufSize]byte
+	bpos int
+	end  int
+	buf  [bufSize]byte
 
 	poly  Poly
 	shift int
@@ -120,47 +119,56 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		}
 	}
 
-	r.start = r.bpos
 	r.lastChunk = buf[:0]
-	count := 1
+	count := 0
+loop:
+	for {
+		for i, b := range r.buf[r.bpos:r.end] {
+			r.slide(b)
+			count++
 
-	for ; count <= r.min; count++ {
-		r.slide(r.buf[r.bpos])
-		r.bpos++
-
-		// if chunk is still less than minimal size
-		// but more data needs to be read
-		if r.bpos == r.end && count < r.min {
-			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
-			if !r.updateBuf() {
-				return r.chomp()
+			if count == r.min {
+				r.lastChunk = append(r.lastChunk, r.buf[r.bpos:r.bpos+i+1]...)
+				r.bpos += i + 1
+				break loop
 			}
+		}
+
+		r.lastChunk = append(r.lastChunk, r.buf[r.bpos:r.end]...)
+		r.bpos = r.end
+		if !r.updateBuf() {
+			return r.chomp()
 		}
 	}
 
-	if r.digest&mask == 0 || r.bpos == r.end {
-		r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+	if r.digest&mask == 0 || r.bpos == r.end || count == r.max {
 		if !r.updateBuf() && r.err == io.EOF {
 			return r.chunk()
 		}
 	}
 
-	for ; count <= r.max; count++ {
-		r.slide(r.buf[r.bpos])
-		r.bpos++
-
-		if r.digest&mask == 0 || count == r.max {
-			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
-			return r.chunk()
-		} else if r.bpos == r.end {
-			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
-			if !r.updateBuf() {
-				return r.chomp()
-			}
-		}
+	if count == r.max {
+		return r.chunk()
 	}
 
-	return r.chunk()
+	for {
+		for i, b := range r.buf[r.bpos:r.end] {
+			r.slide(b)
+			count++
+
+			if r.digest&mask == 0 || count == r.max {
+				r.lastChunk = append(r.lastChunk, r.buf[r.bpos:r.bpos+i+1]...)
+				r.bpos += i + 1
+				return r.chunk()
+			}
+		}
+
+		r.lastChunk = append(r.lastChunk, r.buf[r.bpos:r.end]...)
+		r.bpos = r.end
+		if count == r.max || !r.updateBuf() {
+			return r.chomp()
+		}
+	}
 }
 
 func (r *rabin) chomp() (*Chunk, error) {
@@ -180,8 +188,6 @@ func (r *rabin) updateBuf() bool {
 
 	r.bpos = 0
 	r.end = 0
-	r.start = 0
-
 	r.end, r.err = io.ReadFull(r.r, r.buf[:])
 
 	if r.err == io.ErrUnexpectedEOF {
