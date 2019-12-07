@@ -71,9 +71,10 @@ type rabin struct {
 	end   int
 	buf   [bufSize]byte
 
-	poly Poly
-	out  [256]Poly
-	mod  [256]Poly
+	poly  Poly
+	shift int
+	out   [256]Poly
+	mod   [256]Poly
 
 	lastChunk []byte
 
@@ -96,9 +97,10 @@ func (r *rabin) Reset(br io.Reader) {
 // min and max chunks sizes.
 func NewRabinWithParams(min, max int) *rabin {
 	r := &rabin{
-		min:  min,
-		max:  max,
-		poly: defaultPoly,
+		min:   min,
+		max:   max,
+		poly:  defaultPoly,
+		shift: deg(defaultPoly) - 8,
 	}
 	r.out, r.mod = calcTables(defaultPoly, winSize)
 
@@ -191,7 +193,7 @@ func (r *rabin) chunk() *Chunk {
 }
 
 func (r *rabin) append(b byte) {
-	index := r.digest >> (deg(r.poly) - 8)
+	index := byte(r.digest >> r.shift)
 	r.digest <<= 8
 	r.digest |= Poly(b)
 	r.digest ^= r.mod[index]
