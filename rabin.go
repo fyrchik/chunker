@@ -8,12 +8,12 @@ import (
 const defaultPoly = Poly(0x3DA3358B4DC173)
 
 const (
-	// minSize is default min chunk size = 512 KiB.
-	minSize = 1 << 19
-	// maxSize is default max chunk size = 8 MiB.
-	maxSize = 1 << 23
-	// avgSize is an average chunk size = 1 MiB.
-	avgSize = 1 << 20
+	// minSize is default min chunk size.
+	minSize = 512 * KiB
+	// maxSize is default max chunk size.
+	maxSize = 8 * MiB
+	// avgSize is an average chunk size.
+	avgSize = 1 * MiB
 	// mask is used for detecting boundaries and is calculated based on
 	// average chunk size.
 	mask = avgSize - 1
