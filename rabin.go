@@ -136,7 +136,7 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 	}
 
 	if r.digest&mask == 0 || r.bpos == r.end && !r.updateBuf() && r.err == io.EOF {
-		return r.chunk(), nil
+		return r.chunk()
 	}
 
 	for ; count <= r.max; count++ {
@@ -144,18 +144,18 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		r.bpos++
 
 		if r.digest&mask == 0 || count == r.max {
-			return r.chunk(), nil
+			return r.chunk()
 		} else if r.bpos == r.end && !r.updateBuf() {
 			return r.chomp()
 		}
 	}
 
-	return r.chunk(), nil
+	return r.chunk()
 }
 
 func (r *rabin) chomp() (*Chunk, error) {
 	if r.err == nil || r.err == io.EOF {
-		return r.chunk(), nil
+		return r.chunk()
 	}
 
 	return nil, r.err
@@ -183,13 +183,13 @@ func (r *rabin) updateBuf() bool {
 	return r.end != 0
 }
 
-func (r *rabin) chunk() *Chunk {
+func (r *rabin) chunk() (*Chunk, error) {
 	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
 
 	return &Chunk{
 		Digest: uint64(r.digest),
 		Data:   r.lastChunk,
-	}
+	}, nil
 }
 
 func (r *rabin) append(b byte) {
