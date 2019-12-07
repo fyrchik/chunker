@@ -130,13 +130,19 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 
 		// if chunk is still less than minimal size
 		// but more data needs to be read
-		if r.bpos == r.end && count < r.min && !r.updateBuf() {
-			return r.chomp()
+		if r.bpos == r.end && count < r.min {
+			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+			if !r.updateBuf() {
+				return r.chomp()
+			}
 		}
 	}
 
-	if r.digest&mask == 0 || r.bpos == r.end && !r.updateBuf() && r.err == io.EOF {
-		return r.chunk()
+	if r.digest&mask == 0 || r.bpos == r.end {
+		r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+		if !r.updateBuf() && r.err == io.EOF {
+			return r.chunk()
+		}
 	}
 
 	for ; count <= r.max; count++ {
@@ -144,9 +150,13 @@ func (r *rabin) Next(buf []byte) (*Chunk, error) {
 		r.bpos++
 
 		if r.digest&mask == 0 || count == r.max {
+			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
 			return r.chunk()
-		} else if r.bpos == r.end && !r.updateBuf() {
-			return r.chomp()
+		} else if r.bpos == r.end {
+			r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
+			if !r.updateBuf() {
+				return r.chomp()
+			}
 		}
 	}
 
@@ -168,8 +178,6 @@ func (r *rabin) updateBuf() bool {
 		return false
 	}
 
-	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
-
 	r.bpos = 0
 	r.end = 0
 	r.start = 0
@@ -184,8 +192,6 @@ func (r *rabin) updateBuf() bool {
 }
 
 func (r *rabin) chunk() (*Chunk, error) {
-	r.lastChunk = append(r.lastChunk, r.buf[r.start:r.bpos]...)
-
 	return &Chunk{
 		Cut:  uint64(r.digest),
 		Data: r.lastChunk,
