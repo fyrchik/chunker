@@ -83,6 +83,13 @@ type rabin struct {
 	digest Poly
 }
 
+type tables struct {
+	out [256]Poly
+	mod [256]Poly
+}
+
+var cache = make(map[Poly]*tables)
+
 // Reset implements Chunker interface.
 func (r *rabin) Reset(br io.Reader) {
 	r.r = br
@@ -101,7 +108,16 @@ func NewRabinWithParams(min, max int) *rabin {
 		poly:  defaultPoly,
 		shift: deg(defaultPoly) - 8,
 	}
-	r.out, r.mod = calcTables(defaultPoly, winSize)
+
+	if c := cache[defaultPoly]; c != nil {
+		r.out, r.mod = c.out, c.mod
+	} else {
+		r.out, r.mod = calcTables(defaultPoly, winSize)
+		cache[defaultPoly] = &tables{
+			out: r.out,
+			mod: r.mod,
+		}
+	}
 
 	return r
 }
